@@ -5,21 +5,43 @@ import dotenv from 'dotenv';
 import { EmailService } from './services/eMailService';
 import { EmailRequest, ProviderTypes } from './types/serviceTypes';
 
-// Umgebungsvariablen laden
-dotenv.config();
+/**
+ * E-Mail Service
+ * =================
+ *
+ * Dieser Service dient als Wrapper für den Versand von E-Mails. 
+ * Er bietet eine einheitliche Schnittstelle für den Versand von E-Mails über unterschiedliche E-Mail-Provider.
+ *
+ * Der Service verwendet die Umgebungsvariablen:
+ *
+ * - `PORT`: Der Port auf dem der Service hört.
+ * - `URL_CLIENT`: Die URL des Frontend-Servers, der den Service anfragt.
+ * - `USER_EMAIL`: Die E-Mail-Adresse, die als Absender verwendet werden soll.
+ * - `SMTP_PROVIDER`: Der Name des E-Mail-Providers, der verwendet werden soll. 
+ *    Hinweis: Derzeit werden die Provider `gmail`, `gmx` und `outlook` unterstützt.
+ * - `PROVIDER_PASSWORD`: Das Passwort für den E-Mail-Provider.
+ *
+ * Der Service bietet eine API mit den folgenden Endpunkten:
+ * 
+ * - `POST /api/send-email`: Sendet eine E-Mail an die angegebene Adresse.
+ * - `GET /api/service-status`: Liefert den Status des Services.
+ * - `POST /api/test-email`: Sendet eine Test-E-Mail an den angegebenen Empfänger.
+ * 
+ */
 
+
+ // Umgebungsvariablen laden
+dotenv.config();
+const { PORT, URL_CLIENT, USER_EMAIL, SMTP_PROVIDER, PROVIDER_PASSWORD } = process.env;
 const app = express();
-const port = process.env.PORT || 3000;
-const provider: ProviderTypes = process.env.SMTP_PROVIDER as ProviderTypes;
-const recipientEmail: string = process.env.USER_EMAIL || '';
 
 // E-Mail Service Instanz erstellen
-const emailService = new EmailService(provider, recipientEmail);
+const emailService = new EmailService(SMTP_PROVIDER as ProviderTypes, USER_EMAIL as string);
 
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.URL_CLIENT,
+  origin: URL_CLIENT,
   methods: ['GET', 'POST'],
 }));
 
@@ -34,7 +56,8 @@ app.post('/api/send-email', async (req, res) => {
   try {
     const emailData: EmailRequest = req.body;
     const result = await emailService.sendEmail(emailData);
-    
+    console.log(`result: ${JSON.stringify(result)}`);
+
     if (result.success) {
       res.status(200).json(result);
 
@@ -107,8 +130,8 @@ async function startServer() {
       process.exit(1);
     }
 
-    app.listen(port, () => {
-      console.log(`🚀 Email microservice running on port ${port}`);
+    app.listen(PORT, () => {
+      console.log(`🚀 Email microservice running on port ${PORT}`);
     });
 
   } catch (error) {
@@ -118,7 +141,7 @@ async function startServer() {
 }
 
 function checkRequiredEnvVars(): boolean {
-    return !!(process.env.USER_EMAIL && process.env.PROVIDER_PASSWORD);
+    return !!(USER_EMAIL && PROVIDER_PASSWORD && SMTP_PROVIDER);
 }
 
 startServer();

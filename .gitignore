@@ -22,6 +22,12 @@ lib-cov
 coverage
 *.lcov
 
+# macOS
+.DS_Store
+
+# Local database files
+database/
+
 # nyc test coverage
 .nyc_output
 

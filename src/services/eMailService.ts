@@ -1,11 +1,22 @@
 import nodemailer, { Transporter } from 'nodemailer';
 import { EmailRequest, EmailResponse, EmailConfig, ProviderTypes } from '../types/serviceTypes';
 import { getEmailConfig } from '../configs/eMailConfig';
+import { EmailBlocker } from './eMailBlocker';
 
+/**
+ * Klasse für den Versand von E-Mails via SMTP.
+ * Sie bietet eine Instanz, die den Versand von E-Mails via SMTP-Protokoll ermöglicht.
+ * Es können E-Mails mit Text- oder HTML-Inhalt versendet werden.
+ * 
+ * @class EmailService
+ * @param {ProviderTypes} provider - Der Name des E-Mail-Providers, der verwendet werden soll.
+ * @param {string} recipientEmail - Die E-Mail-Adresse, an die die E-Mail gesendet werden soll.
+ */
 export class EmailService {
   private transporter: Transporter;
   private provider: ProviderTypes;
   private recipientEmail: string;
+  private emailBlocker = new EmailBlocker();
 
   constructor(provider: ProviderTypes , recipientEmail: string) {
     this.provider = provider;
@@ -65,10 +76,8 @@ export class EmailService {
         }
       };
 
-      console.log(`📧 Sending email via ${this.provider} to ${this.recipientEmail}`);
-
+      console.log(`📧 Sending email via ${this.provider} to ${this.recipientEmail} ...`);
       const info = await this.transporter.sendMail(mailOptions);
-      
       console.log(`Email sent successfully: ${info.response}`);
       
       return {
@@ -100,8 +109,10 @@ export class EmailService {
     if (!emailRegex.test(senderEmail)) throw new Error('Invalid sender email format');
     if (!emailRegex.test(this.recipientEmail)) throw new Error('Invalid recipient email format');
 
-    // TODO: Prüfen, ob der Absender in der Blacklist ist
-
+    // Prüfen, ob der Absender in der Blacklist ist
+    if (this.emailBlocker.isBlockedAddress(senderEmail)) {
+      throw new Error(`>> Adress '${senderEmail}' is blocked.`);
+    }
   }
 
   /**
