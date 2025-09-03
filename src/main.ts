@@ -1,1 +1,0 @@
-console.log("Config is valid.")
