@@ -6,8 +6,9 @@ import { EmailService } from './services/eMailService';
 import { EmailRequest, ProviderTypes } from './types/serviceTypes';
 
 /**
- * E-Mail Service
- * =================
+ * ============================================
+ * E-Mail Service (Version 1.0.0)
+ * ============================================
  *
  * Dieser Service dient als Wrapper für den Versand von E-Mails. 
  * Er bietet eine einheitliche Schnittstelle für den Versand von E-Mails über unterschiedliche E-Mail-Provider.
@@ -15,7 +16,7 @@ import { EmailRequest, ProviderTypes } from './types/serviceTypes';
  * Der Service verwendet die Umgebungsvariablen:
  *
  * - `PORT`: Der Port auf dem der Service hört.
- * - `URL_CLIENT`: Die URL des Frontend-Servers, der den Service anfragt.
+ * - `ALLOWED_ORIGINS`: Die URL des Clients, der den Service anfragt. [Auch als Liste (kommasepariert) möglich]
  * - `USER_EMAIL`: Die E-Mail-Adresse, die als Absender verwendet werden soll.
  * - `SMTP_PROVIDER`: Der Name des E-Mail-Providers, der verwendet werden soll. 
  *    Hinweis: Derzeit werden die Provider `gmail`, `gmx` und `outlook` unterstützt.
@@ -26,6 +27,11 @@ import { EmailRequest, ProviderTypes } from './types/serviceTypes';
  * - `POST /api/send-email`: Sendet eine E-Mail an die angegebene Adresse.
  * - `GET /api/service-status`: Liefert den Status des Services.
  * 
+ * Zudem kann eine 'Blacklist' verwaltet werden, um bestimmte E-Mail-Adressen zu blockieren. 
+ * Diese wird beim Start des Services aus einer JSON-Datei geladen/initialisiert und bei Änderungen gespeichert.
+ * Die Blacklist-Funktionen sind in der Klasse `EmailBlocker` im Modul `eMailBlocker.ts` implementiert.
+ * 
+ * ============================================
  */
 
 
@@ -114,7 +120,7 @@ process.on('SIGINT', () => {
   process.emit('SIGTERM');  // Gleiche Behandlung wie SIGTERM
 });
 
-// Server starten
+// Funktion zum Starten des Servers
 async function startServer() {
   try {
     app.listen(PORT || DEFAULT_PORT, () => {
@@ -127,6 +133,7 @@ async function startServer() {
   }
 }
 
+// Überprüft, ob alle erforderlichen Umgebungsvariablen gesetzt sind
 function checkRequiredEnvVars(): void {
   const { ALLOWED_ORIGINS, USER_EMAIL, SMTP_PROVIDER, PROVIDER_PASSWORD } = process.env;
 
@@ -139,9 +146,11 @@ function checkRequiredEnvVars(): void {
   }
 }
 
+// Liest die erlaubten Clients aus der Umgebungsvariable ALLOWED_ORIGINS als Array ein
 function getAllowedOrigins(): string[] {
   const origins = process.env.ALLOWED_ORIGINS || '';
   return origins.split(',').map(origin => origin.trim());
 }
 
+// Server starten
 startServer();

@@ -1,7 +1,7 @@
 {
   "name": "email_service",
   "version": "1.0.0",
-  "description": "Repository for providing e-Mails as microservice",
+  "description": "Service for providing e-Mails via different providers",
   "main": "server.js",
   "scripts": {
     "dev": "nodemon src/server.ts",
