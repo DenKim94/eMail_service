@@ -170,6 +170,26 @@ export class EmailService {
     }
   }
 
+  async blockEmail(email: string): Promise<boolean> {
+    try {
+      this.emailBlocker.blockAddress(email);
+      return true;
+    } catch (error) {
+      console.error('❌ Error blocking email:', error);
+      return false;
+    }
+  }
+
+  async unblockEmail(email: string): Promise<boolean> {
+    try {
+      this.emailBlocker.unblockAddress(email);
+      return true;
+    } catch (error) {
+      console.error('❌ Error unblocking email:', error);
+      return false;
+    }
+  }
+  
   /**
    * Schließt den Transporter (für Cleanup)
    */
