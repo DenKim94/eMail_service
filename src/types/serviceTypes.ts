@@ -3,7 +3,6 @@ export type EmailRequest = {
   senderEmail: string;
   subject: string;
   message: string;
-  isHTML?: boolean;
 }
 
 export type EmailConfig = {
@@ -20,6 +19,7 @@ export type EmailResponse = {
   success: boolean;
   messageId?: string;
   error?: string;
+  code?: number;
 }
 
 export type ProviderTypes = 'gmail' | 'gmx' | 'outlook';

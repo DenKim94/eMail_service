@@ -1,8 +1,5 @@
-import dotenv from 'dotenv';
 import { BlacklistManager } from './dataBaseManager';
 
-dotenv.config();
-const { EMAIL_BLACKLIST } = process.env;
 
 export class EmailBlocker {
     private blockedEmails: string[];
@@ -20,6 +17,12 @@ export class EmailBlocker {
         if (!this.blockedEmails.includes(cleanEmail)) {
             this.BlacklistManager.addMailToList(cleanEmail);
         }
+    }
+
+    syncData(): void {
+        this.BlacklistManager.saveData();
+        this.blockedEmails = this.BlacklistManager.getBlacklist().map(entry => entry.email);
+        console.log('>> Data sync completed.');
     }
 
     unblockAddress(email: string): void {

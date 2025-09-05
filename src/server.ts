@@ -25,23 +25,24 @@ import { EmailRequest, ProviderTypes } from './types/serviceTypes';
  * 
  * - `POST /api/send-email`: Sendet eine E-Mail an die angegebene Adresse.
  * - `GET /api/service-status`: Liefert den Status des Services.
- * - `POST /api/test-email`: Sendet eine Test-E-Mail an den angegebenen Empfänger.
  * 
  */
 
 
  // Umgebungsvariablen laden
 dotenv.config();
-const { PORT, URL_CLIENT, USER_EMAIL, SMTP_PROVIDER, PROVIDER_PASSWORD } = process.env;
+checkRequiredEnvVars();
+const { PORT, USER_EMAIL, SMTP_PROVIDER } = process.env;
 const app = express();
 
 // E-Mail Service Instanz erstellen
 const emailService = new EmailService(SMTP_PROVIDER as ProviderTypes, USER_EMAIL as string);
+const DEFAULT_PORT = 3000;
 
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: URL_CLIENT,
+  origin: getAllowedOrigins(),
   methods: ['GET', 'POST'],
 }));
 
@@ -66,7 +67,7 @@ app.post('/api/send-email', async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Error in /send-email:', error);
+    console.error('>> Error in /send-email:', error);
     res.status(400).json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -94,15 +95,6 @@ app.use('/*splat', (req, res) => {
   });
 });
 
-// Global Error Handler
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({
-    success: false,
-    error: 'Internal server error'
-  });
-});
-
 // Graceful Shutdown
 process.on('SIGTERM', async () => {
   console.log('SIGTERM: Shutting down the service ...');
@@ -110,9 +102,9 @@ process.on('SIGTERM', async () => {
   const closed = await emailService.close();
 
   if (closed) {
-    console.log('Email service closed successfully');
+    console.log('✅ Email service closed successfully');
   } else {
-    console.error('Failed to close email service');
+    console.error('❌ Failed to close email service');
   }
   process.exit(0);
 });
@@ -125,13 +117,8 @@ process.on('SIGINT', () => {
 // Server starten
 async function startServer() {
   try {
-    if (!checkRequiredEnvVars()) {
-      console.error('Missing required environment variables');
-      process.exit(1);
-    }
-
-    app.listen(PORT, () => {
-      console.log(`🚀 Email microservice running on port ${PORT}`);
+    app.listen(PORT || DEFAULT_PORT, () => {
+      console.log(`🚀 Email-Service is running on port ${PORT || DEFAULT_PORT}`);
     });
 
   } catch (error) {
@@ -140,8 +127,21 @@ async function startServer() {
   }
 }
 
-function checkRequiredEnvVars(): boolean {
-    return !!(USER_EMAIL && PROVIDER_PASSWORD && SMTP_PROVIDER);
+function checkRequiredEnvVars(): void {
+  const { ALLOWED_ORIGINS, USER_EMAIL, SMTP_PROVIDER, PROVIDER_PASSWORD } = process.env;
+
+  if (!!(USER_EMAIL && PROVIDER_PASSWORD && SMTP_PROVIDER && ALLOWED_ORIGINS)) {
+    console.log('✅ All required environment variables are set.');
+
+  }  else {
+    console.error('❗️ Missing one or more required environment variables: USER_EMAIL, PROVIDER_PASSWORD, SMTP_PROVIDER, ALLOWED_ORIGINS');
+    process.exit(1);
+  }
+}
+
+function getAllowedOrigins(): string[] {
+  const origins = process.env.ALLOWED_ORIGINS || '';
+  return origins.split(',').map(origin => origin.trim());
 }
 
 startServer();
