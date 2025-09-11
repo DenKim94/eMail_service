@@ -19,8 +19,8 @@ import { EmailRequest, ProviderTypes } from './types/serviceTypes';
  * - `ALLOWED_ORIGINS`: Die URL des Clients, der den Service anfragt. [Auch als Liste (kommasepariert) möglich]
  * - `USER_EMAIL`: Die E-Mail-Adresse, die als Absender verwendet werden soll.
  * - `SMTP_PROVIDER`: Der Name des E-Mail-Providers, der verwendet werden soll. 
- *    Hinweis: Derzeit werden die Provider `gmail`, `gmx` und `outlook` unterstützt.
- * - `PROVIDER_PASSWORD`: Das Passwort für den E-Mail-Provider.
+ *    Hinweis: Derzeit werden die Provider `gmail` und `gmx`unterstützt.
+ * - `PROVIDER_PASSWORD`: Das (App-) Passwort für den E-Mail-Provider.
  *
  * Der Service bietet eine API mit den folgenden Endpunkten:
  * 
@@ -63,18 +63,18 @@ app.post('/api/send-email', async (req, res) => {
   try {
     const emailData: EmailRequest = req.body;
     const result = await emailService.sendEmail(emailData);
-    console.log(`result: ${JSON.stringify(result)}`);
 
     if (result.success) {
       res.status(200).json(result);
 
     } else {
-      res.status(500).json(result);
+      res.status(result.code ? result.code : 503).json(result);
+      console.log(`result: ${JSON.stringify(result)}`);
     }
 
   } catch (error) {
     console.error('>> Error in /send-email:', error);
-    res.status(400).json({
+    res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
     });
@@ -84,8 +84,9 @@ app.post('/api/send-email', async (req, res) => {
 // Service Status
 app.get('/api/service-status', async (_, res) => {
   const status = await emailService.getStatus();
-
-  res.status(200).json({
+  const code = status.connected ? 200 : 503;
+  
+  res.status(code).json({
     service: 'email-server',
     status: status.connected ? 'online' : 'offline',
     timestamp: new Date().toISOString(),

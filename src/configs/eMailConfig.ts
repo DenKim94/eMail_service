@@ -13,10 +13,6 @@ export const getEmailConfig = (provider: ProviderTypes): EmailConfig => {
             hostName = 'mail.gmx.net';
             break;
 
-        case 'outlook':
-            hostName = 'smtp-mail.outlook.com';
-            break;
-
         default:
             throw new Error(`Unsupported email provider: ${provider}`);
     }
