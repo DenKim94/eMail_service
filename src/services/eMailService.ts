@@ -74,8 +74,7 @@ export class EmailService {
         from: `"${emailData.senderName}" <${process.env.USER_EMAIL}>`,
         to: this.recipientEmail,
         subject: emailData.subject,
-        text: this.filterMessage(emailData.message),
-        // html: emailData.isHTML ? this.filterMessage(emailData.message) : undefined,    
+        text: this.filterMessage(emailData.message),   
         replyTo: `"${emailData.senderName}" <${emailData.senderEmail}>`,
         
         headers: {
