@@ -147,14 +147,24 @@ export class EmailService {
   }
 
   /**
-   * Filtert den Inhalt der Email-Nachricht um sicherzustellen, dass keine unerwünschten Zeichen (HTML-Tags) enthalten sind.
+   * Filtert den Inhalt der Email-Nachricht um sicherzustellen, dass keine unsicheren Zeichen enthalten sind.
    * Eingabe: Nachricht als String
    * Ausgabe: Gefilterte Nachricht als String
    * @param message - Die zu filternde Email-Nachricht
    * @returns Die gefilterte Email-Nachricht
    */
   private filterMessage(message: string): string {
-    return message.replace(/<[^>]*>/g, '*').trim();
+
+    // Entfernt <script> und <style> Blöcke samt Inhalt
+    let out = message.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+                    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '');
+
+    // Entfernt alle HTML-Tags
+    out = out.replace(/<\/?[\w\s="/.':;#-\/\?]+>/gi, '');
+
+    // Entfernt gefährliche Inline-Event-Attribute und Styles
+    out = out.replace(/\s(on\w+|style)=["'][^"']*["']/gi, '');
+    return out.trim();
   }
 
   /**
