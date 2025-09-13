@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { EmailService } from './services/eMailService';
 import { EmailRequest, ProviderTypes } from './types/serviceTypes';
+import { globalLimiter, emailLimiter, devEmailLimiter } from './configs/rateLimiterConfig';
 
 /**
  * ============================================
@@ -21,6 +22,7 @@ import { EmailRequest, ProviderTypes } from './types/serviceTypes';
  * - `SMTP_PROVIDER`: Der Name des E-Mail-Providers, der verwendet werden soll. 
  *    Hinweis: Derzeit werden die Provider `gmail` und `gmx`unterstützt.
  * - `PROVIDER_PASSWORD`: Das (App-) Passwort für den E-Mail-Provider.
+ * - `NODE_ENV`: Der aktuelle Modus des Services. (z.B. "development" oder "production")
  *
  * Der Service bietet eine API mit den folgenden Endpunkten:
  * 
@@ -38,7 +40,7 @@ import { EmailRequest, ProviderTypes } from './types/serviceTypes';
  // Umgebungsvariablen laden
 dotenv.config();
 checkRequiredEnvVars();
-const { PORT, USER_EMAIL, SMTP_PROVIDER } = process.env;
+const { PORT, USER_EMAIL, SMTP_PROVIDER, NODE_ENV } = process.env;
 const app = express();
 
 // E-Mail Service Instanz erstellen
@@ -46,11 +48,15 @@ const emailService = new EmailService(SMTP_PROVIDER as ProviderTypes, USER_EMAIL
 const DEFAULT_PORT = 3000;
 
 // Middleware
+app.set('trust proxy', 2); // Wichtig für korrekte Bestimmung der req.ip aus X-Forwarded-For 
 app.use(helmet());
 app.use(cors({
   origin: getAllowedOrigins(),
   methods: ['GET', 'POST'],
 }));
+
+// Rate-Limiter früh registrieren, bevor Body geparsed wird
+app.use(globalLimiter); // globales Basiskontingent
 
 app.use(express.json({ 
     limit: '10mb',                    // Maximale Größe der Anfrage
@@ -58,8 +64,10 @@ app.use(express.json({
     type: 'application/json',         // Nur für diesen Content-Type
  }));
 
+ const limiterConfig = NODE_ENV === 'development' ? devEmailLimiter : emailLimiter;
+
 // E-Mail senden
-app.post('/api/send-email', async (req, res) => {
+app.post('/api/send-email', limiterConfig, async (req, res) => {
   try {
     const emailData: EmailRequest = req.body;
     const result = await emailService.sendEmail(emailData);
@@ -136,13 +144,13 @@ async function startServer() {
 
 // Überprüft, ob alle erforderlichen Umgebungsvariablen gesetzt sind
 function checkRequiredEnvVars(): void {
-  const { ALLOWED_ORIGINS, USER_EMAIL, SMTP_PROVIDER, PROVIDER_PASSWORD } = process.env;
+  const { ALLOWED_ORIGINS, USER_EMAIL, SMTP_PROVIDER, PROVIDER_PASSWORD, NODE_ENV } = process.env;
 
-  if (!!(USER_EMAIL && PROVIDER_PASSWORD && SMTP_PROVIDER && ALLOWED_ORIGINS)) {
+  if (!!(USER_EMAIL && PROVIDER_PASSWORD && SMTP_PROVIDER && ALLOWED_ORIGINS && NODE_ENV)) {
     console.log('✅ All required environment variables are set.');
 
   }  else {
-    console.error('❗️ Missing one or more required environment variables: USER_EMAIL, PROVIDER_PASSWORD, SMTP_PROVIDER, ALLOWED_ORIGINS');
+    console.error('❗️ Missing one or more required environment variables: USER_EMAIL, PROVIDER_PASSWORD, SMTP_PROVIDER, ALLOWED_ORIGINS, NODE_ENV');
     process.exit(1);
   }
 }

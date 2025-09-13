@@ -1,41 +1,76 @@
-import rateLimit from 'express-rate-limit';
+import { rateLimit }  from 'express-rate-limit';
+import type { Request, Response } from 'express';
 
-// Globaler Rate-Limiter für alle Endpunkte
-export const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 Minuten
-  max: 100,                 // Max 100 Requests pro IP in 15 Minuten
-  message: {
-    success: false,
-    error: 'Too many requests from this IP address. Please try again later.',
-    retryAfter: '15 minutes'
-  },
-  standardHeaders: true, // Rate-Limit-Header aktivieren
-  legacyHeaders: false,
-  keyGenerator: (req) => { 
-    // TODO: IP-Ermittlung anpassen, falls hinter Proxy [12.09.2025]
-    return req.ip || req.socket?.remoteAddress || 'unknown';
-  }
-});
+// IPv6-Subnetz für die Bündelung wählen (Werte zwischen 60 - 64)
+const IPV6_SUBNET = 62;
 
-// Spezifischer E-Mail Rate-Limiter - restriktiver
-export const emailLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 Stunde
-  max: 10, // Max 10 E-Mails pro IP pro Stunde
-  standardHeaders: true,
-  skipFailedRequests: false, // Auch fehlgeschlagene Requests zählen
-  skipSuccessfulRequests: false,
-  handler: (req, res) => {
-    console.warn(`⚠️ Email rate limit exceeded for IP: ${req.ip}`);
-
-    const resetTime = req.rateLimit?.resetTime;
-    const resetTimeNum = Number(resetTime) || 0;
-    const retryAfter = resetTimeNum > 0 ? Math.round((resetTimeNum - Date.now()) / 1000) : 3600;
-
-    res.status(429).json({
+  // Globaler Rate-Limiter
+  export const globalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 100, 
+    standardHeaders: 'draft-8',      
+    legacyHeaders: false,
+    message: {
       success: false,
-      error: 'Email rate limit exceeded',
+      error: 'Too many requests from this IP address. Please try again later.',
+      retryAfter: '15 minutes'
+    },
+    ipv6Subnet: IPV6_SUBNET
+  });
+
+  // Spezifischer E-Mail Rate-Limiter (restriktiver)
+  export const emailLimiter = rateLimit({
+    windowMs: 30 * 60 * 1000,
+    limit: 30,
+    standardHeaders: 'draft-8',
+    skipFailedRequests: false,
+    skipSuccessfulRequests: false,
+    ipv6Subnet: IPV6_SUBNET,
+
+    handler: (req, res, _next, _options) => {
+      rateLimitHandler(req, res);
+    }
+  });
+
+  export const devEmailLimiter = rateLimit({
+    windowMs: 10 * 1000,        // 10s
+    limit: 3,                   // 3 Req je 10s
+    standardHeaders: 'draft-8', // bzw. 'draft-8' in neueren Versionen
+    legacyHeaders: false,
+    ipv6Subnet: IPV6_SUBNET,
+
+    handler: (req, res, _next, _options) => {
+      rateLimitHandler(req, res);
+    }
+  });
+
+
+  /**
+   * Handler-Funktion, die aufgerufen wird, wenn die Rate-Limit erreicht wurde.
+   * Sie gibt eine JSON-Antwort mit dem Status 429 (Too Many Requests) zurück.
+   * Die Antwort enthält eine Fehlermeldung, einen HTTP-Statuscode und die Zeit in Sekunden, nach der die Rate-Limit wieder frei ist.
+   */
+  function rateLimitHandler(req: Request, res: Response) {
+    // req.rateLimit enthaltet u. a. resetTime laut Typdefinition/Docs
+    const reset = req.rateLimit?.resetTime;
+    const resetMs = typeof reset === 'number' ? reset : reset?.getTime?.();
+    const retryAfterSec = Math.max(Math.round(((resetMs ?? Date.now() + 10_000) - Date.now()) / 1000), 0);
+
+    const info = req.rateLimit;
+
+    console.warn('⚠️ [rate-limit]: ', {
+      route: req.originalUrl,
+      method: req.method,
+      ip: req.ip,
+      remaining: info?.remaining,
+      limit: info?.limit,
+      resetTime: info?.resetTime?.toISOString?.()
+    });
+
+    return res.status(429).json({
+      success: false,
+      error: 'Rate limit exceeded',
       code: 429,
-      retryAfter: Math.max(retryAfter, 0) 
+      retryAfter: retryAfterSec
     });
   }
-});
