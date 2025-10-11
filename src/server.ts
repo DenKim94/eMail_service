@@ -36,6 +36,7 @@ import { globalLimiter, emailLimiter, devEmailLimiter } from './configs/rateLimi
  * ============================================
  */
 
+// TODO [11.10.2025]: Server-Architektur verbessern --> Dependency Injection Pattern
 
  // Umgebungsvariablen laden
 dotenv.config();
@@ -161,5 +162,11 @@ function getAllowedOrigins(): string[] {
   return origins.split(',').map(origin => origin.trim());
 }
 
-// Server starten
-startServer();
+// Server-Start nur bei direkter Ausführung
+if (require.main === module) {
+  startServer();
+}
+
+// App exportieren für Tests
+export { app };
+
