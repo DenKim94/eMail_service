@@ -143,11 +143,3 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
-
-# Tests
-tests/*
-**/*.test.ts
-**/*.spec.ts
-
-# Mocks
-__mocks__/*
