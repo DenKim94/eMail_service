@@ -34,12 +34,13 @@ import { globalLimiter, emailLimiter, devEmailLimiter } from './configs/rateLimi
  * 
  * @returns {express.Express} - Die Express-App
  */
-export function createApp(emailServiceInstance?: EmailService) : express.Express {
+export async function createApp(emailServiceInstance?: EmailService) : Promise<express.Express> {
   const app = express();
   const { USER_EMAIL, SMTP_PROVIDER, NODE_ENV } = process.env;
 
   // E-Mail Service Instanz erstellen (oder die übergebene verwenden)
   const emailService = emailServiceInstance || new EmailService(SMTP_PROVIDER as ProviderTypes, USER_EMAIL as string);
+  await emailService.initialize(); // Explizit initialisieren
 
   // Middleware
   app.set('trust proxy', 2); // Wichtig für korrekte Bestimmung der req.ip aus X-Forwarded-For 
@@ -49,7 +50,7 @@ export function createApp(emailServiceInstance?: EmailService) : express.Express
     methods: ['GET', 'POST'],
   }));
 
-  const limiterConfig = NODE_ENV === 'development' ? devEmailLimiter : emailLimiter;
+  const limiterConfig = (NODE_ENV === 'development') ? devEmailLimiter : emailLimiter;
   // Rate-Limiter früh registrieren, bevor Body geparsed wird
   app.use(globalLimiter); // globales Basiskontingent
 
@@ -163,7 +164,7 @@ function setupGracefulShutdown(emailService: EmailService): void {
 
 // Server-Start nur bei direkter Ausführung
 if (require.main === module) {
-   // Umgebungsvariablen laden
+  // Umgebungsvariablen laden
   dotenv.config();
   checkRequiredEnvVars();
   const emailService = new EmailService(
@@ -171,9 +172,14 @@ if (require.main === module) {
     process.env.USER_EMAIL as string
   );
   
-  const app = createApp(emailService);
-  setupGracefulShutdown(emailService);
-  startServer(app);
+  createApp(emailService).then((app) => {
+    setupGracefulShutdown(emailService);
+    startServer(app);
+
+  }).catch((err) => {
+    console.error('❌ Failed to start app:', err);
+    process.exit(1);
+  });
 }
 
 // Für Tests exportieren

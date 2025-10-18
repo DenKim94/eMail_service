@@ -1,5 +1,7 @@
+import blockedEmails from '../../../database/blackList.json';
+
 export class BlacklistManager {
-  private blacklist: Array<{ email: string; blockedAt: string }> = [];
+  private blacklist: Array<{ email: string; blockedAt: string ; reason?: string}> = blockedEmails;
 
   getBlacklist() {
     return this.blacklist;
@@ -34,6 +36,6 @@ export class BlacklistManager {
 
   // Hilfsmethode für Tests zum Zurücksetzen
   reset(): void {
-    this.blacklist = [];
+    this.blacklist = blockedEmails;
   }
 }

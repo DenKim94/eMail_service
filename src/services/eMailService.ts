@@ -17,6 +17,7 @@ export class EmailService {
   private provider: ProviderTypes;
   private recipientEmail: string;
   private emailBlocker = new EmailBlocker();
+  private isConnected: boolean = false;
 
   constructor(provider: ProviderTypes , recipientEmail: string) {
     this.provider = provider;
@@ -38,9 +39,28 @@ export class EmailService {
         maxConnections: 5,             // Max. 5 parallele Verbindungen
         maxMessages: 100               // 100 E-Mails pro Verbindung
     });
+  }
 
-    // Verbindung testen
-    this.verifyConnection();
+    // Separate Initialisierung für async-Logik
+  async initialize(): Promise<void> {
+
+    // Im Testmodus: Immer als connected markieren
+    if (process.env.NODE_ENV === 'test') {
+      console.log(`✅ Test mode: Skipping SMTP verification for ${this.provider}`);
+      this.isConnected = true;
+      return;
+    }
+
+    // Produktionsmodus: Echte Validierung durchführen
+    try {
+      await this.verifyConnection();
+      this.isConnected = true;
+    } catch (error) {
+      console.error(`❌ SMTP connection failed for ${this.provider}:`, error);
+      if (process.env.NODE_ENV !== 'test') {
+        throw error;
+      }
+    }
   }
 
   private async verifyConnection(): Promise<void> {
@@ -65,6 +85,15 @@ export class EmailService {
    *   Wenn ein Fehler aufgetreten ist, enthält der Response eine Fehlermeldung und einen entsprechenden HTTP-Statuscode.
    */
   async sendEmail(emailData: EmailRequest): Promise<EmailResponse> {
+
+    if (!this.isConnected && process.env.NODE_ENV !== 'test') {
+      return {
+        success: false,
+        error: 'EmailService not initialized',
+        code: 503
+      };
+    }
+
     try {
       // Input-Validierung
       this.validateEmailData(emailData);
@@ -85,7 +114,7 @@ export class EmailService {
 
       console.log(`📧 Sending email via ${this.provider} to ${this.recipientEmail} ...`);
       const info = await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Email sent successfully: ${info.response}`);
+      console.log(`✅ Email has been sent successfully.`);
       
       return {
         success: true,
@@ -142,7 +171,7 @@ export class EmailService {
       throw new EmailValidationError(EmailValidationErrorCode.MissingData, 'Invalid recipient email format');
 
     if (this.emailBlocker.isBlockedAddress(senderEmail)) {
-      throw new EmailValidationError(EmailValidationErrorCode.BlockedSender, `Adress '${senderEmail}' is blocked.`);
+      throw new EmailValidationError(EmailValidationErrorCode.BlockedSender, `Address '${senderEmail}' is blocked.`);
     }
   }
 

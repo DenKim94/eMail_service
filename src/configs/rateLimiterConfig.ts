@@ -3,6 +3,8 @@ import type { Request, Response } from 'express';
 
 // IPv6-Subnetz für die Bündelung wählen (Werte zwischen 60 - 64)
 const IPV6_SUBNET = 62;
+export const EMAIL_RATE_LIMIT: number = 25;
+export const EMAIL_WINDOW_MS: number = 30 * 60 * 1000; // 30 Minuten
 
   // Globaler Rate-Limiter
   export const globalLimiter = rateLimit({
@@ -20,8 +22,8 @@ const IPV6_SUBNET = 62;
 
   // Spezifischer E-Mail Rate-Limiter (restriktiver)
   export const emailLimiter = rateLimit({
-    windowMs: 30 * 60 * 1000,
-    limit: 30,
+    windowMs: EMAIL_WINDOW_MS,
+    limit: EMAIL_RATE_LIMIT,
     standardHeaders: 'draft-8',
     skipFailedRequests: false,
     skipSuccessfulRequests: false,
@@ -34,7 +36,7 @@ const IPV6_SUBNET = 62;
 
   export const devEmailLimiter = rateLimit({
     windowMs: 10 * 1000,        // 10s
-    limit: 3,                   // 3 Req je 10s
+    limit: 5,                   // 5 Req je 10s
     standardHeaders: 'draft-8', // bzw. 'draft-8' in neueren Versionen
     legacyHeaders: false,
     ipv6Subnet: IPV6_SUBNET,
