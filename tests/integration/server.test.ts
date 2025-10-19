@@ -84,7 +84,7 @@ import request from 'supertest';
 import type { Express } from 'express';
 import createApp from '../../src/server';
 import blockedEmails from '../../database/blackList.json';
-import { EMAIL_RATE_LIMIT } from '../../src/configs/rateLimiterConfig';
+import { EMAIL_RATE_LIMIT, emailRateLimitStore } from '../../src/configs/rateLimiterConfig';
 import * as TestParams from '../testParams';
 
 const nodemailerMock = require('nodemailer');
@@ -103,10 +103,13 @@ describe('E-Mail Service API Integration Tests', () => {
     if (typeof nodemailerMock.reset === 'function') {
       nodemailerMock.reset();
     }
-    totalTests += 1;
+
+    // Limiter-Zähler zurücksetzen, falls die Anzahl der Tests das Limit erreicht hat
+    (totalTests >= EMAIL_RATE_LIMIT) ? emailRateLimitStore.resetAll() : totalTests += 1;
   });
 
  describe('POST /api/send-email', () => {
+
     it('Prüfung, ob eine E-Mail mit gültigen Daten erfolgreich gesendet wird.', async () => {
       const emailData = {
         senderName: 'Test Sender',
@@ -210,11 +213,18 @@ describe('E-Mail Service API Integration Tests', () => {
         expect(response.body.error).toContain(`Address '${email}' is blocked.`);
       }
     );
+  });
+
+  describe('[Rate-Limiter]: POST /api/send-email', () => {
+
+    beforeAll(() => {
+      // Vor der Testdurchführung den Rate-Limiter-Zähler zurücksetzen
+      emailRateLimitStore.resetAll();
+    });
 
     it(`Prüfung, ob der Rate-Limiter nach ${EMAIL_RATE_LIMIT} Anfragen ausgelöst und der Statuscode 429 mit Fehlermeldung ausgegeben wird.`, async () => {
-      const numberOfRequests = (totalTests-1) < EMAIL_RATE_LIMIT ? (EMAIL_RATE_LIMIT - (totalTests-1)) : ((totalTests-1) - EMAIL_RATE_LIMIT);
 
-      for (let i = 0; i < (numberOfRequests); i++) {
+      for (let i = 0; i < (EMAIL_RATE_LIMIT); i++) {
         const response = await request(app)
           .post('/api/send-email')
           .send({
