@@ -1,0 +1,33 @@
+# ============================================
+# Dependencies
+# Werden im Image per `npm ci` installiert.
+# Die Host-Variante ist plattformspezifisch (native Module)
+# und wuerde die korrekt installierte im Container ueberschreiben.
+# ============================================
+node_modules
+
+# ============================================
+# Build-Output
+# Wird in der build-Stage per `npm run build` erzeugt.
+# ============================================
+dist
+coverage
+
+# ============================================
+# Secrets
+# .env.test wird von der test-Stage benoetigt (dotenv)
+# und ist daher bewusst ausgenommen.
+# ============================================
+.env*
+!.env.test
+
+# ============================================
+# Nicht benoetigt im Image
+# ============================================
+.git
+.gitignore
+.claude
+.DS_Store
+Dockerfile
+.dockerignore
+README.md

@@ -1,7 +1,7 @@
 # ============================================
 # Build Stage
 # ============================================
-FROM node:22.19.0-bullseye-slim AS build
+FROM node:26.13.0-trixie-slim AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -12,7 +12,7 @@ RUN npm run build
 # ============================================
 # Test Stage
 # ============================================
-FROM node:22.19.0-bullseye-slim AS test
+FROM node:26.13.0-trixie-slim AS test
 WORKDIR /app
 
 # Dependencies für Tests (inkl. devDependencies) installieren
@@ -28,7 +28,7 @@ RUN npm test
 # ============================================
 # Production Stage
 # ============================================
-FROM node:22.19.0-bullseye-slim AS runtime
+FROM node:26.13.0-trixie-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package*.json ./

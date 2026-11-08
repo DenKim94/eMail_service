@@ -18,6 +18,8 @@ export class EmailService {
   private recipientEmail: string;
   private emailBlocker = new EmailBlocker();
   private isConnected: boolean = false;
+  private lastInitAttempt: number = 0;
+  private static readonly RECONNECT_COOLDOWN_MS = 60_000;
 
   constructor(provider: ProviderTypes , recipientEmail: string) {
     this.provider = provider;
@@ -31,7 +33,12 @@ export class EmailService {
       auth: config.auth,
       // Zusätzliche Sicherheitsoptionen
       tls: {
-        rejectUnauthorized: false
+        // Kein rejectUnauthorized: false – die Zertifikatsprüfung bleibt aktiv
+        // (nodemailer-Default ist true). Node prüft gegen seinen eigenen,
+        // mitgelieferten Root-Store; das slim-Image braucht dafür kein
+        // ca-certificates-Paket. Wichtig: NODE_OPTIONS=--use-openssl-ca nicht
+        // setzen, sonst läuft die Prüfung gegen einen leeren OS-Store.
+        minVersion: 'TLSv1.2'
       },
         connectionTimeout: 10000,      // Timeout für Verbindungsaufbau (ms)
         greetingTimeout: 10000,        // Timeout für SMTP-Greeting (ms)
@@ -56,10 +63,13 @@ export class EmailService {
       await this.verifyConnection();
       this.isConnected = true;
     } catch (error) {
-      console.error(`❌ SMTP connection failed for ${this.provider}:`, error);
-      if (process.env.NODE_ENV !== 'test') {
-        throw error;
-      }
+      // Bewusst kein throw: der Service startet auch ohne SMTP-Verbindung und
+      // antwortet mit 503, statt den Prozess zu beenden. Ein throw landet in
+      // server.ts im catch mit process.exit(1) und ergibt zusammen mit
+      // "restart: always" eine Neustart-Schleife.
+      console.error(`❌ SMTP connection failed for ${this.provider} – starting in 'offline' state:`, error);
+      this.isConnected = false;
+      this.lastInitAttempt = Date.now();
     }
   }
 
@@ -87,11 +97,20 @@ export class EmailService {
   async sendEmail(emailData: EmailRequest): Promise<EmailResponse> {
 
     if (!this.isConnected && process.env.NODE_ENV !== 'test') {
-      return {
-        success: false,
-        error: 'EmailService not initialized',
-        code: 503
-      };
+      // Ein Reconnect-Versuch pro Cooldown-Fenster: nach korrigierten
+      // Zugangsdaten heilt sich der Service beim naechsten Versand selbst,
+      // ohne dass jede Anfrage in einen SMTP-Timeout laeuft.
+      if (Date.now() - this.lastInitAttempt >= EmailService.RECONNECT_COOLDOWN_MS) {
+        await this.initialize();
+      }
+
+      if (!this.isConnected) {
+        return {
+          success: false,
+          error: 'EmailService not initialized',
+          code: 503
+        };
+      }
     }
 
     try {
